@@ -1,14 +1,13 @@
 import sys, logging, datetime, json, os
 import xml.etree.ElementTree as ET
 from urllib.request import urlopen, Request
-from urllib.error import URLError
 
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN", "")
 CHAT_ID = int(os.environ.get("CHAT_ID", "0"))
 
 RSS_FEEDS = [
-    {"name": "Los Alcazares", "url": "https://news.google.com/rss/search?q=%22Los+Alc%C3%A1zares%22&hl=es&gl=ES&ceid=ES:es", "max": 5},
-    {"name": "Region de Murcia", "url": "https://news.google.com/rss/search?q=%22Regi%C3%B3n+de+Murcia%22&hl=es&gl=ES&ceid=ES:es", "max": 7},
+    {"name": "LOS ALCAZARES", "url": "https://news.google.com/rss/search?q=%22Los+Alc%C3%A1zares%22&hl=es&gl=ES&ceid=ES:es", "max": 5},
+    {"name": "REGION DE MURCIA", "url": "https://news.google.com/rss/search?q=%22Regi%C3%B3n+de+Murcia%22&hl=es&gl=ES&ceid=ES:es", "max": 6},
 ]
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -20,22 +19,19 @@ def fetch_rss(url, max_items):
         with urlopen(req, timeout=15) as resp:
             data = resp.read()
         root = ET.fromstring(data)
-        items = root.findall(".//item")[:max_items]
         articles = []
-        for item in items:
+        for item in root.findall(".//item")[:max_items]:
             title = item.findtext("title", default="Sin titulo")
             link = item.findtext("link", default="")
             source = ""
             if " - " in title:
                 parts = title.rsplit(" - ", 1)
-                title = parts[0].strip()
-                source = parts[1].strip()
-            if len(title) > 90:
-                title = title[:87] + "..."
+                title = parts[0].strip()[:80]
+                source = parts[1].strip()[:30]
             articles.append({"title": title, "link": link, "source": source})
         return articles
     except Exception as exc:
-        logging.error(f"Error en {url}: {exc}")
+        logging.error(f"fetch error: {exc}")
     return []
 
 def mes_es(n):
@@ -43,32 +39,33 @@ def mes_es(n):
 
 def build_message(sections):
     hoy = datetime.date.today()
-    lines = [f"Noticias del dia - {hoy.day} de {mes_es(hoy.month)} de {hoy.year}", ""]
+    lines = [f"Noticias {hoy.day} {mes_es(hoy.month)} {hoy.year}", ""]
     for sec in sections:
-        lines.append(sec["name"].upper())
-        lines.append("-" * 20)
+        lines.append(sec["name"])
+        lines.append("-" * 16)
         if not sec["articles"]:
-            lines.append("Sin noticias hoy.")
+            lines.append("Sin noticias.")
         else:
             for i, art in enumerate(sec["articles"], 1):
-                src = f" ({art['source']})" if art["source"] else ""
+                src = f" [{art['source']}]" if art["source"] else ""
                 lines.append(f"{i}. {art['title']}{src}")
-                lines.append(f"   {art['link']}")
         lines.append("")
-    lines.append("Agente automatico - Los Alcazares & Murcia")
-    return "\n".join(lines)
+    lines.append("Bot noticias Alcazares-Murcia")
+    msg = "
+".join(lines)
+    return msg[:4000]
 
 def send_telegram(text):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-    payload = json.dumps({"chat_id": CHAT_ID, "text": text, "disable_web_page_preview": True}).encode("utf-8")
+    payload = json.dumps({"chat_id": CHAT_ID, "text": text}).encode("utf-8")
     try:
         req = Request(url, data=payload, headers={"Content-Type": "application/json"})
         with urlopen(req, timeout=20) as resp:
             result = json.loads(resp.read())
         if result.get("ok"):
-            logging.info("Mensaje enviado.")
+            logging.info("Enviado OK")
             return True
-        logging.error(f"Error Telegram: {result}")
+        logging.error(f"Telegram error: {result}")
         return False
     except Exception as exc:
         logging.error(f"Excepcion: {exc}")
@@ -84,7 +81,7 @@ def main():
         sections.append({"name": cfg["name"], "articles": arts})
     ok = send_telegram(build_message(sections))
     if ok:
-        print("Noticias enviadas correctamente.")
+        print("Enviado correctamente.")
     else:
         print("Error al enviar.")
         sys.exit(1)
