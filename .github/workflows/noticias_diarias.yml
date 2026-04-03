@@ -15,14 +15,15 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Diagnostico secrets
+      - name: Test directo Telegram con curl
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
         run: |
-          echo "Token length: ${#TELEGRAM_TOKEN}"
+          echo "Token len: ${#TELEGRAM_TOKEN}"
           echo "Chat ID: ${CHAT_ID}"
-          python -c "import os; t=os.environ.get('TELEGRAM_TOKEN',''); print('Python token len:', len(t))"
+          curl -s "https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage" \
+            -d "chat_id=${CHAT_ID}&text=Prueba+bot+funcionando"
       - name: Enviar noticias a Telegram
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
