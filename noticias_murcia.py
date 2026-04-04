@@ -51,8 +51,7 @@ def build_message(sections):
                 lines.append(f"{i}. {art['title']}{src}")
         lines.append("")
     lines.append("Bot noticias Alcazares-Murcia")
-    msg = "
-".join(lines)
+    msg = "\n".join(lines)
     return msg[:4000]
 
 def send_telegram(text):
