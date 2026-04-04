@@ -6,8 +6,9 @@ TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN", "")
 CHAT_ID = int(os.environ.get("CHAT_ID", "0"))
 
 RSS_FEEDS = [
-    {"name": "LOS ALCAZARES", "url": "https://news.google.com/rss/search?q=%22Los+Alc%C3%A1zares%22&hl=es&gl=ES&ceid=ES:es", "max": 5},
-    {"name": "REGION DE MURCIA", "url": "https://news.google.com/rss/search?q=%22Regi%C3%B3n+de+Murcia%22&hl=es&gl=ES&ceid=ES:es", "max": 6},
+    {"name": "LOS ALCAZARES (La Verdad)", "url": "https://www.laverdad.es/rss/2.0/?section=murcia/los-alcazares", "max": 5},
+    {"name": "REGION DE MURCIA (La Verdad)", "url": "https://www.laverdad.es/rss/2.0/?section=murcia", "max": 4},
+    {"name": "REGION DE MURCIA (La Opinion)", "url": "https://news.google.com/rss/search?q=site:laopiniondemurcia.es&hl=es&gl=ES&ceid=ES:es", "max": 4},
 ]
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -22,17 +23,16 @@ def fetch_rss(url, max_items):
         articles = []
         for item in root.findall(".//item")[:max_items]:
             title = item.findtext("title", default="Sin titulo")
-            link = item.findtext("link", default="")
             source = ""
             if " - " in title:
                 parts = title.rsplit(" - ", 1)
                 title = parts[0].strip()[:80]
                 source = parts[1].strip()[:30]
-            articles.append({"title": title, "link": link, "source": source})
+            articles.append({"title": title, "source": source})
         return articles
     except Exception as exc:
         logging.error(f"fetch error: {exc}")
-    return []
+        return []
 
 def mes_es(n):
     return ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"][n-1]
@@ -42,7 +42,7 @@ def build_message(sections):
     lines = [f"Noticias {hoy.day} {mes_es(hoy.month)} {hoy.year}", ""]
     for sec in sections:
         lines.append(sec["name"])
-        lines.append("-" * 16)
+        lines.append("-" * 20)
         if not sec["articles"]:
             lines.append("Sin noticias.")
         else:
