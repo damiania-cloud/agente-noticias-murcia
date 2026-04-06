@@ -56,7 +56,7 @@ def fetch_rss(url, max_items):
         return []
 
 
-def escape_html(text):
+def esc(text):
     return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
@@ -70,13 +70,14 @@ def build_message(sections):
     for sec in sections:
         if not sec["articles"]:
             continue
-        lines.append(f"<b>{escape_html(sec['name'])}</b>")
+        lines.append(f"<b>{esc(sec['name'])}</b>")
         lines.append("-" * 20)
         for i, art in enumerate(sec["articles"], 1):
-            src = f" [{escape_html(art['source'])}]" if art["source"] else ""
-            title = escape_html(art["title"])
+            src = f" [{esc(art['source'])}]" if art["source"] else ""
+            title = esc(art["title"])
             if art["link"]:
-                lines.append(f'{i}. {title}{src} <a href="{art["link"]}">mas</a>')
+                safe_link = esc(art["link"])
+                lines.append(f'{i}. {title}{src} <a href="{safe_link}">mas</a>')
             else:
                 lines.append(f"{i}. {title}{src}")
         lines.append("")
