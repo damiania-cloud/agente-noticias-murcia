@@ -56,32 +56,26 @@ def fetch_rss(url, max_items):
         return []
 
 
-def esc(text):
-    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-
-
 def mes_es(n):
     return ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"][n-1]
 
 
 def build_message(sections):
     hoy = datetime.date.today()
-    lines = [f"<b>Noticias nuevas {hoy.day} {mes_es(hoy.month)} {hoy.year}</b>", ""]
+    lines = [f"*Noticias nuevas {hoy.day} {mes_es(hoy.month)} {hoy.year}*", ""]
     for sec in sections:
         if not sec["articles"]:
             continue
-        lines.append(f"<b>{esc(sec['name'])}</b>")
+        lines.append(f"*{sec['name']}*")
         lines.append("-" * 20)
         for i, art in enumerate(sec["articles"], 1):
-            src = f" [{esc(art['source'])}]" if art["source"] else ""
-            title = esc(art["title"])
+            src = f" [{art['source']}]" if art["source"] else ""
             if art["link"]:
-                safe_link = esc(art["link"])
-                lines.append(f'{i}. {title}{src} <a href="{safe_link}">mas</a>')
+                lines.append(f"{i}. {art['title']}{src} [mas]({art['link']})")
             else:
-                lines.append(f"{i}. {title}{src}")
+                lines.append(f"{i}. {art['title']}{src}")
         lines.append("")
-    lines.append("<i>Bot noticias Alcazares-Murcia</i>")
+    lines.append("_Bot noticias Alcazares-Murcia_")
     msg = "\n".join(lines)
     return msg[:4000]
 
@@ -91,7 +85,7 @@ def send_telegram(text):
     payload = json.dumps({
         "chat_id": CHAT_ID,
         "text": text,
-        "parse_mode": "HTML",
+        "parse_mode": "Markdown",
         "disable_web_page_preview": True
     }).encode("utf-8")
     try:
@@ -104,7 +98,13 @@ def send_telegram(text):
         logging.error(f"Telegram error: {result}")
         return False
     except Exception as exc:
-        logging.error(f"Excepcion: {exc}")
+        body = ""
+        if hasattr(exc, "read"):
+            try:
+                body = exc.read().decode("utf-8")
+            except Exception:
+                pass
+        logging.error(f"Excepcion: {exc} | Body: {body}")
         return False
 
 
