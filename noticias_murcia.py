@@ -56,32 +56,43 @@ def fetch_rss(url, max_items):
         return []
 
 
+def escape_html(text):
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
 def mes_es(n):
     return ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"][n-1]
 
 
 def build_message(sections):
     hoy = datetime.date.today()
-    lines = [f"Noticias nuevas {hoy.day} {mes_es(hoy.month)} {hoy.year}", ""]
+    lines = [f"<b>Noticias nuevas {hoy.day} {mes_es(hoy.month)} {hoy.year}</b>", ""]
     for sec in sections:
         if not sec["articles"]:
             continue
-        lines.append(sec["name"])
+        lines.append(f"<b>{escape_html(sec['name'])}</b>")
         lines.append("-" * 20)
         for i, art in enumerate(sec["articles"], 1):
-            src = f" [{art['source']}]" if art["source"] else ""
-            lines.append(f"{i}. {art['title']}{src}")
+            src = f" [{escape_html(art['source'])}]" if art["source"] else ""
+            title = escape_html(art["title"])
             if art["link"]:
-                lines.append(f"   {art['link']}")
+                lines.append(f'{i}. {title}{src} <a href="{art["link"]}">mas</a>')
+            else:
+                lines.append(f"{i}. {title}{src}")
         lines.append("")
-    lines.append("Bot noticias Alcazares-Murcia")
+    lines.append("<i>Bot noticias Alcazares-Murcia</i>")
     msg = "\n".join(lines)
     return msg[:4000]
 
 
 def send_telegram(text):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-    payload = json.dumps({"chat_id": CHAT_ID, "text": text}).encode("utf-8")
+    payload = json.dumps({
+        "chat_id": CHAT_ID,
+        "text": text,
+        "parse_mode": "HTML",
+        "disable_web_page_preview": True
+    }).encode("utf-8")
     try:
         req = Request(url, data=payload, headers={"Content-Type": "application/json"})
         with urlopen(req, timeout=20) as resp:
