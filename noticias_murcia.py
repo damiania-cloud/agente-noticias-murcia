@@ -43,12 +43,13 @@ def fetch_rss(url, max_items):
         articles = []
         for item in root.findall(".//item")[:max_items]:
             title = item.findtext("title", default="Sin titulo")
+            link = item.findtext("link", default="").strip()
             source = ""
             if " - " in title:
                 parts = title.rsplit(" - ", 1)
                 title = parts[0].strip()[:80]
                 source = parts[1].strip()[:30]
-            articles.append({"title": title, "source": source})
+            articles.append({"title": title, "source": source, "link": link})
         return articles
     except Exception as exc:
         logging.error(f"fetch error: {exc}")
@@ -70,6 +71,8 @@ def build_message(sections):
         for i, art in enumerate(sec["articles"], 1):
             src = f" [{art['source']}]" if art["source"] else ""
             lines.append(f"{i}. {art['title']}{src}")
+            if art["link"]:
+                lines.append(f"   {art['link']}")
         lines.append("")
     lines.append("Bot noticias Alcazares-Murcia")
     msg = "\n".join(lines)
