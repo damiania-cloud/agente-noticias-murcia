@@ -1,9 +1,11 @@
-import sys, logging, datetime, json, os
+import sys, logging, datetime, json, os, hashlib
 import xml.etree.ElementTree as ET
 from urllib.request import urlopen, Request
 
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN", "")
 CHAT_ID = int(os.environ.get("CHAT_ID", "0"))
+SEEN_FILE = "sent_news.json"
+MAX_SEEN = 500
 
 RSS_FEEDS = [
     {"name": "LOS ALCAZARES (La Verdad)", "url": "https://www.laverdad.es/rss/2.0/?section=murcia/los-alcazares", "max": 5},
@@ -13,6 +15,24 @@ RSS_FEEDS = [
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 HEADERS = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) Chrome/120.0"}
+
+
+def load_seen():
+    if os.path.exists(SEEN_FILE):
+        with open(SEEN_FILE, "r") as f:
+            return set(json.load(f).get("sent", []))
+    return set()
+
+
+def save_seen(seen):
+    seen_list = list(seen)[-MAX_SEEN:]
+    with open(SEEN_FILE, "w") as f:
+        json.dump({"sent": seen_list}, f)
+
+
+def article_id(title):
+    return hashlib.md5(title.lower().strip()[:120].encode()).hexdigest()[:16]
+
 
 def fetch_rss(url, max_items):
     try:
@@ -34,25 +54,27 @@ def fetch_rss(url, max_items):
         logging.error(f"fetch error: {exc}")
         return []
 
+
 def mes_es(n):
     return ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"][n-1]
 
+
 def build_message(sections):
     hoy = datetime.date.today()
-    lines = [f"Noticias {hoy.day} {mes_es(hoy.month)} {hoy.year}", ""]
+    lines = [f"Noticias nuevas {hoy.day} {mes_es(hoy.month)} {hoy.year}", ""]
     for sec in sections:
+        if not sec["articles"]:
+            continue
         lines.append(sec["name"])
         lines.append("-" * 20)
-        if not sec["articles"]:
-            lines.append("Sin noticias.")
-        else:
-            for i, art in enumerate(sec["articles"], 1):
-                src = f" [{art['source']}]" if art["source"] else ""
-                lines.append(f"{i}. {art['title']}{src}")
+        for i, art in enumerate(sec["articles"], 1):
+            src = f" [{art['source']}]" if art["source"] else ""
+            lines.append(f"{i}. {art['title']}{src}")
         lines.append("")
     lines.append("Bot noticias Alcazares-Murcia")
     msg = "\n".join(lines)
     return msg[:4000]
+
 
 def send_telegram(text):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
@@ -70,20 +92,41 @@ def send_telegram(text):
         logging.error(f"Excepcion: {exc}")
         return False
 
+
 def main():
     if not TELEGRAM_TOKEN or CHAT_ID == 0:
         print("Faltan TELEGRAM_TOKEN o CHAT_ID")
         sys.exit(1)
+
+    seen = load_seen()
     sections = []
+    new_hashes = set()
+
     for cfg in RSS_FEEDS:
-        arts = fetch_rss(cfg["url"], cfg["max"])
-        sections.append({"name": cfg["name"], "articles": arts})
+        all_arts = fetch_rss(cfg["url"], cfg["max"])
+        new_arts = []
+        for art in all_arts:
+            h = article_id(art["title"])
+            if h not in seen:
+                new_arts.append(art)
+                new_hashes.add(h)
+        sections.append({"name": cfg["name"], "articles": new_arts})
+
+    total_new = sum(len(s["articles"]) for s in sections)
+
+    if total_new == 0:
+        print("Sin noticias nuevas. No se envia mensaje.")
+        sys.exit(0)
+
     ok = send_telegram(build_message(sections))
     if ok:
-        print("Enviado correctamente.")
+        seen.update(new_hashes)
+        save_seen(seen)
+        print(f"Enviado OK: {total_new} noticias nuevas.")
     else:
         print("Error al enviar.")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()
